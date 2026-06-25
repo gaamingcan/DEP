@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"dep/internal/domain"
 	"dep/internal/git"
 	"dep/internal/repo"
 
@@ -33,12 +34,12 @@ func NewExecCmd(projectDir *string) *cobra.Command {
 				return fmt.Errorf("missing command after --")
 			}
 
-			cfg, _, paths, err := loadProject(projectDir)
+			proj, paths, err := loadProject(projectDir)
 			if err != nil {
 				return err
 			}
 
-			urls, err := repo.ResolveURLs(repoIdentifiers, cfg.URLs())
+			urls, err := repo.ResolveURLs(repoIdentifiers, proj.URLs())
 			if err != nil {
 				return err
 			}
@@ -106,9 +107,9 @@ func parseExecArgs(args []string, parallel *bool, timeout *time.Duration, projec
 	return repoIdentifiers, commandName, commandArgs, nil
 }
 
-func execSerial(urls []string, projectRoot, commandName string, commandArgs []string) error {
+func execSerial(urls []domain.URL, projectRoot, commandName string, commandArgs []string) error {
 	for _, url := range urls {
-		dirName := repo.DirName(url)
+		dirName := url.DirName()
 		repoPath := repo.RepoPath(projectRoot, url)
 		output, err := git.Exec(context.Background(), repoPath, commandName, commandArgs)
 		if output != "" {
@@ -116,7 +117,7 @@ func execSerial(urls []string, projectRoot, commandName string, commandArgs []st
 				prefix: fmt.Sprintf("[%s] ", dirName),
 				out:    os.Stdout,
 			}
-			w.Write([]byte(output))
+			_, _ = w.Write([]byte(output))
 		}
 		if err != nil {
 			return fmt.Errorf("%s: %w", dirName, err)
@@ -125,7 +126,7 @@ func execSerial(urls []string, projectRoot, commandName string, commandArgs []st
 	return nil
 }
 
-func execParallel(urls []string, projectRoot, commandName string, commandArgs []string, timeout time.Duration) error {
+func execParallel(urls []domain.URL, projectRoot, commandName string, commandArgs []string, timeout time.Duration) error {
 	ctx := context.Background()
 	var cancel context.CancelFunc
 
@@ -145,7 +146,7 @@ func execParallel(urls []string, projectRoot, commandName string, commandArgs []
 		go func() {
 			defer wg.Done()
 
-			dirName := repo.DirName(url)
+			dirName := url.DirName()
 			repoPath := repo.RepoPath(projectRoot, url)
 
 			output, err := git.Exec(ctx, repoPath, commandName, commandArgs)
@@ -154,7 +155,7 @@ func execParallel(urls []string, projectRoot, commandName string, commandArgs []
 					prefix: fmt.Sprintf("[%s] ", dirName),
 					out:    os.Stdout,
 				}
-				w.Write([]byte(output))
+				_, _ = w.Write([]byte(output))
 			}
 			if err != nil {
 				errCh <- fmt.Errorf("%s: %w", dirName, err)

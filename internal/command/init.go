@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"dep/internal/config"
-	"dep/internal/lock"
+	"dep/internal/domain"
+	"dep/internal/store"
 
 	"github.com/spf13/cobra"
 )
@@ -21,29 +21,14 @@ func NewInitCmd(projectDir *string) *cobra.Command {
 				return err
 			}
 
-			if _, err := os.Stat(paths.ConfigPath); err == nil {
-				return fmt.Errorf("%s already exists", config.FileName)
-			} else if !os.IsNotExist(err) {
-				return err
-			}
-
 			if _, err := os.Stat(paths.LockPath); err == nil {
-				return fmt.Errorf("%s already exists", lock.FileName)
+				return fmt.Errorf("%s already exists", store.FileName)
 			} else if !os.IsNotExist(err) {
 				return err
 			}
 
-			cfg := config.NewEmpty()
-			if err := config.Write(paths.ConfigPath, cfg); err != nil {
-				return err
-			}
-
-			lk := lock.NewEmpty()
-			if err := lock.Write(paths.LockPath, lk); err != nil {
-				return err
-			}
-
-			return nil
+			proj := domain.NewProject()
+			return store.Write(paths.LockPath, proj)
 		},
 	}
 }

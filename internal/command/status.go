@@ -16,21 +16,22 @@ func NewStatusCmd(projectDir *string) *cobra.Command {
 		Use:   "status",
 		Short: "Show abnormal repository states",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, lk, paths, err := loadProject(projectDir)
+			proj, paths, err := loadProject(projectDir)
 			if err != nil {
 				return err
 			}
 
 			abnormal := false
-			for _, r := range cfg.Repositories {
-				dirName := repo.DirName(r.URL)
+			for _, r := range proj.Repositories {
+				dirName := r.URL.DirName()
 				repoPath := repo.RepoPath(paths.Root, r.URL)
-				lockedCommit, ok := lk.CommitForURL(r.URL)
-				if !ok {
-					fmt.Printf("%s missing\n", dirName)
+
+				if r.Commit == nil {
+					fmt.Printf("%s unlocked\n", dirName)
 					abnormal = true
 					continue
 				}
+				lockedCommit := r.Commit
 
 				info, err := os.Stat(repoPath)
 				if os.IsNotExist(err) {
@@ -66,7 +67,7 @@ func NewStatusCmd(projectDir *string) *cobra.Command {
 				if err != nil {
 					return fmt.Errorf("%s: read HEAD failed: %w", dirName, err)
 				}
-				if head != lockedCommit {
+				if head != lockedCommit.String() {
 					fmt.Printf("%s drifted\n", dirName)
 					abnormal = true
 				}

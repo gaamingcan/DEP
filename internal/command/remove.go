@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"dep/internal/config"
-	"dep/internal/lock"
 	"dep/internal/repo"
+	"dep/internal/store"
 
 	"github.com/spf13/cobra"
 )
@@ -22,34 +21,27 @@ func NewRemoveCmd(projectDir *string) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			identifier := args[0]
 
-			cfg, lk, paths, err := loadProject(projectDir)
+			proj, paths, err := loadProject(projectDir)
 			if err != nil {
 				return err
 			}
 
-			url, err := repo.ResolveURL(identifier, cfg.URLs())
+			url, err := repo.ResolveURL(identifier, proj.URLs())
 			if err != nil {
 				return err
 			}
 
-			if err := cfg.Remove(url); err != nil {
+			if err := proj.Remove(url); err != nil {
 				return err
 			}
-			if err := config.Write(paths.ConfigPath, cfg); err != nil {
-				return err
-			}
-
-			if err := lk.Remove(url); err != nil {
-				return err
-			}
-			if err := lock.Write(paths.LockPath, lk); err != nil {
+			if err := store.Write(paths.LockPath, proj); err != nil {
 				return err
 			}
 
 			if deleteLocal {
 				repoPath := repo.RepoPath(paths.Root, url)
 				if err := os.RemoveAll(repoPath); err != nil {
-					return fmt.Errorf("%s: delete local repository failed: %w", repo.DirName(url), err)
+					return fmt.Errorf("%s: delete local repository failed: %w", url.DirName(), err)
 				}
 			}
 

@@ -22,8 +22,7 @@ DEP 不管理仓库内部依赖，不关心项目使用的编程语言。
 * 仓库必须平级组织
 * 每个仓库保持独立 Git 历史
 * Git Commit 是唯一版本标识
-* 一个项目仅包含一个配置文件
-* 一个项目仅包含一个锁文件
+* 一个项目仅包含一个管理文件
 * 配置最小化
 * 命令最小化
 * 行为可预测
@@ -36,7 +35,6 @@ DEP 不管理仓库内部依赖，不关心项目使用的编程语言。
 
 ```text
 workspace/
-├── dep.toml
 ├── dep.lock
 ├── project-a/
 │   └── .git
@@ -55,36 +53,41 @@ workspace/
 
 ---
 
-# 4. 配置文件（dep.toml）
+# 4. 项目管理文件（dep.lock）
 
-用于描述项目包含的仓库。
+项目管理文件是整个项目的唯一数据源，记录所有仓库及其锁定版本。`commit` 字段为可选——未锁定（如刚添加的仓库）的仓库不包含 commit。
 
 ```toml
+version = 1
+
 [[repo]]
 url = "git@github.com:org/project-a.git"
 
 [[repo]]
-url = "https://github.com/org/project-b.git"
+url = "git@github.com:org/project-b.git"
+commit = "f8d32418a64b1f4e61d2d5e7e17a3d52fce3d9d2"
 ```
 
 字段说明：
 
-| 字段  | 说明       |
-| --- | -------- |
-| url | Git 仓库地址 |
+| 字段      | 说明                       |
+| ------- | ------------------------ |
+| version | 文件版本                    |
+| url     | Git 仓库地址                 |
+| commit  | 完整 Git Commit Hash（40 位），可选 |
 
-约束：
+## 约束
 
-* 仓库地址必须以 `.git` 结尾
-* 支持 SSH 与 HTTPS
-* 不保存仓库名称
-* 不保存本地路径
-* 不保存分支
+* `commit` 存在时必须为完整 Hash（40 位）
+* 缺失 `commit` 表示仓库已添加但未锁定
 * 所有仓库按 URL 字符串排序保存
+* `dep.lock` 由 `dep lock` 重建，`dep remove` 删除条目
+* `dep lock` 每次执行均重建整个文件，不进行增量更新
+* `dep add` 与 `dep sync` 不修改已有 commit 信息
 
 ---
 
-## 仓库地址
+# 5. 仓库地址
 
 仓库地址是仓库的唯一标识。
 
@@ -111,40 +114,6 @@ git@github.com:org/project-a.git
 
 ---
 
-# 5. 锁文件（dep.lock）
-
-记录项目所有仓库对应的源码版本。
-
-```toml
-version = 1
-
-[[repo]]
-url = "git@github.com:org/project-a.git"
-commit = "f8d32418a64b1f4e61d2d5e7e17a3d52fce3d9d2"
-
-[[repo]]
-url = "https://github.com/org/project-b.git"
-commit = "92ad33e6e7c3c77d9d2f7f0f7e2e8a4c1fd91244"
-```
-
-字段说明：
-
-| 字段      | 说明                       |
-| ------- | ------------------------ |
-| version | 锁文件版本                    |
-| url     | Git 仓库地址                 |
-| commit  | 完整 Git Commit Hash（40 位） |
-
-## 约束
-
-- Commit 必须为完整 Hash（40 位）
-- 所有仓库按 URL 字符串排序保存
-- `dep.lock` 由 `dep lock` 命令重建，`dep remove` 命令可删除其中的条目
-- `dep lock` 每次执行均重建整个锁文件，不进行增量更新
-- `dep add` 与 `dep sync` 不修改锁文件
-
----
-
 # 6. CLI
 
 ## 初始化项目
@@ -155,7 +124,6 @@ dep init
 
 生成：
 
-* `dep.toml`
 * `dep.lock`
 
 ---
@@ -176,12 +144,12 @@ dep add git@github.com:org/project-a.git
 
 1. 校验 URL 格式
 2. 推导目录名称
-3. 若 URL 已在 `dep.toml` 中：
+3. 若 URL 已在 `dep.lock` 中：
    * 本地目录存在 → 报错退出（URL 已存在）
    * 本地目录不存在 → 跳至步骤 4（补克隆）
 4. 检测目录冲突
 5. Clone 仓库
-6. 更新 `dep.toml`
+6. 更新 `dep.lock`
 
 URL 校验：
 
@@ -191,7 +159,7 @@ URL 校验：
 异常：
 
 * URL 不合法
-* URL 已在 `dep.toml` 中且本地目录也存在
+* URL 已在 `dep.lock` 中且本地目录也存在
 * 推导目录已存在且不是 Git 仓库
 * 推导目录已存在但属于其他仓库
 
@@ -213,8 +181,7 @@ dep remove git@github.com:org/project-a.git
 
 执行：
 
-* 删除配置
-* 删除锁记录
+* 从 `dep.lock` 删除条目
 * 默认保留本地仓库
 
 仓库解析顺序：
@@ -255,8 +222,7 @@ dep sync
 
 执行：
 
-* 以 `dep.lock` 为唯一数据源，遍历所有锁记录
-* 若仓库在锁文件中但不在 `dep.toml` 中，自动补入 `dep.toml`
+* 以 `dep.lock` 为唯一数据源，遍历所有已锁定（含 `commit`）的仓库
 * Clone 缺失仓库
 * Fetch Git 对象
 * Checkout 到锁文件指定 Commit
@@ -285,11 +251,12 @@ dep status
 
 状态：
 
-| 状态      | 说明              |
+| 状态 | 说明 |
 | ------- | --------------- |
-| missing | 仓库不存在           |
-| invalid | 不是有效 Git 仓库     |
-| dirty   | 工作区存在未提交修改      |
+| unlocked | 仓库已添加但未锁定 |
+| missing | 仓库不存在 |
+| invalid | 不是有效 Git 仓库 |
+| dirty | 工作区存在未提交修改 |
 | drifted | 当前 HEAD 与锁文件不一致 |
 
 全部正常：
@@ -392,8 +359,7 @@ dep sync
 
 # 9. 设计特点
 
-* 单一配置文件（`dep.toml`）
-* 单一锁文件（`dep.lock`）
+* 单一管理文件（`dep.lock`）
 * Git Commit 作为唯一版本标识
 * Git 仓库地址作为唯一仓库标识
 * 多仓库平级组织
