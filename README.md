@@ -5,74 +5,82 @@
 
 # DEP — Git Multi-Repository Project Manager
 
-DEP 管理一组独立 Git 仓库，将其视为一个项目。开发者使用 `dep sync` 即可将本地仓库恢复到锁文件指定的精确版本，实现项目级源码可复现。
+DEP manages a collection of independent Git repositories as a single project. `dep sync` restores every local repository to the exact commit recorded in the lock file, enabling reproducible project-level checkouts.
 
-## 安装
+[中文版](README.zh.md)
 
-依赖：Go 1.21+、Git
+## Install
+
+Requires: Go 1.21+, Git
+
+### Option 1: Download from Releases (recommended)
+
+Download the pre-built binary for your platform from the [Releases](https://github.com/gaamingcan/DEP/releases) page:
 
 ```bash
-# 此命令安装到 `$HOME/go/bin/dep`，需将 `$HOME/go/bin` 加入 `PATH`
-go install github.com/org/dep@latest
-
-or
-
-git clone <repo-url> && cd dep
-go build -o dep 
-sudo cp dep /usr/local/bin/ or /usr/bin/
+# Example: Linux amd64
+curl -LO https://github.com/gaamingcan/DEP/releases/download/v0.2.0/dep-0.2.0-linux-amd64.tar.gz
+tar xzf dep-0.2.0-linux-amd64.tar.gz
+sudo cp dep /usr/local/bin/
 ```
 
-
-## 快速开始
+### Option 2: Build from source
 
 ```bash
-# 初始化项目
+git clone https://github.com/gaamingcan/DEP && cd DEP
+go build -o dep .
+sudo cp dep /usr/local/bin/
+```
+
+## Quick Start
+
+```bash
+# Initialize the project
 dep init
 
-# 添加仓库
+# Add repositories
 dep add git@github.com:org/project-a.git
 dep add git@github.com:org/project-b.git
 
-# 锁定版本并提交锁文件
+# Lock HEAD commits and commit the lock file
 dep lock
-git add dep.lock && git commit -m "lock versions 1.0.0.1"
+git add dep.lock && git commit -m "lock versions"
 
-# 提交配置（锁文件需 git push 到远程）
+# Push to remote
 git push
 ```
 
-其他开发者同步项目：
+Other developers sync the project:
 
 ```bash
 git pull
 dep sync
 ```
 
-此时所有仓库被同步到 `dep.lock` 记录的精确版本。
+All repositories are now checked out to the exact commits recorded in `dep.lock`.
 
-## 命令
+## Commands
 
-| 命令 | 功能 |
-|------|------|
-| `dep init` | 在当前目录初始化项目 |
-| `dep add <url>` | 添加并 Clone 仓库 |
-| `dep remove <repo>` | 移除仓库（保留本地文件） |
-| `dep lock` | 锁定所有仓库 HEAD 到 dep.lock |
-| `dep sync` | 按 dep.lock 恢复所有仓库 |
-| `dep status` | 显示异常仓库 |
-| `dep exec -- <cmd>` | 在所有仓库执行命令 |
-| `dep exec -p -- <cmd>` | 并行执行命令（`-p` 或 `--parallel`） |
+| Command | Description |
+|---------|-------------|
+| `dep init` | Initialize a project in the current directory |
+| `dep add <url>` | Add and clone a repository |
+| `dep remove <repo>` | Remove a repository (keep local files) |
+| `dep lock` | Lock all HEAD commits to dep.lock |
+| `dep sync` | Restore all repositories from dep.lock |
+| `dep status` | Show abnormal repository states |
+| `dep exec -- <cmd>` | Run a command in every repository |
+| `dep exec -p -- <cmd>` | Run in parallel (`-p` or `--parallel`) |
 
-## 文件
+## Files
 
-| 文件 | 说明 |
-|------|------|
-| `dep.lock` | 项目管理文件（仓库列表 + 锁定版本），需提交到版本控制 |
+| File | Description |
+|------|-------------|
+| `dep.lock` | Project management file (repository list + locked commits), commit to VCS |
 
-## 理念
+## Principles
 
-- 仓库平级，保持独立 Git 历史
-- Git Commit 是唯一版本标识
-- 配置最小化，仅 7 条命令
-- dep.lock 提交到版本控制，保障全团队一致
-
+- Repositories are peers, each keeps its own Git history
+- Git commit is the sole version identifier
+- Minimal configuration — only 7 commands
+- dep.lock is committed to version control, ensuring team-wide consistency
