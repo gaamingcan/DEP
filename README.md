@@ -78,6 +78,17 @@ All repositories are now checked out to the exact commits recorded in `dep.lock`
 |------|-------------|
 | `dep.lock` | Project management file (repository list + locked commits), commit to VCS |
 
+```toml
+version = 1
+
+[[repo]]
+url = "git@github.com:org/project-a.git"
+
+[[repo]]
+url = "git@github.com:org/project-b.git"
+commit = "f8d32418a64b1f4e61d2d5e7e17a3d52fce3d9d2"
+```
+
 ## Principles
 
 - Repositories are peers, each keeps its own Git history
